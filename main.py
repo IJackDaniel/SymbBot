@@ -11,7 +11,6 @@ from texts import *
 from classes import *
 from settings import *
 
-
 ##########################################################################
 
 
@@ -25,21 +24,51 @@ dp = Dispatcher()
 order = Order()
 # Флаг для считывания деталей заказа
 ready = False
+# Словарь, где ключ это сообщение в чате менеджеров,
+# а значение, это ID пользователя, отправившего его
+struct_id = {}
 
 
 ##########################################################################
 
 
 def check_admin(id):
-    if id == ID_ADMIN:
+    if id in ID_ADMIN:
         return True
     return False
 
 
 def check_user(id):
-    if id in ID_PEOPLE:
+    if id in ID_PEOPLE or id in ID_ADMIN:
         return True
     return False
+
+
+# Проверка ID беседы (нужны беседы менеджеров)
+# Беседы менеджеров, где бот - админ
+def check_chat(id):
+    if id in ID_CHAT:
+        return True
+    return False
+
+
+# Проверка ID беседы (нужны личные сообщения)
+# Личное общение с ботом
+def check_solo(id_person, id_chat):
+    if check_user(id_person) and not check_chat(id_chat):
+        return True
+    return False
+
+
+##########################################################################
+
+
+def create_message(structure):
+    return f"""Новый заказ.
+        Категория: {structure.get_category()}
+        Подкатегория: {structure.get_sub_category()}
+        Детали:
+        {structure.get_properties()}"""
 
 
 ##########################################################################
@@ -102,27 +131,28 @@ async def get_id(message: types.Message):
 # Хэндлер на команду /start
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    # Приветственное сообщение
-    await message.answer(HELLO)
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        # Приветственное сообщение
+        await message.answer(HELLO)
 
-    # Создание кнопок
-    kb = [
-        [types.KeyboardButton(text=CREATE_ORDER_BUTTON)]
-    ]
+        # Создание кнопок
+        kb = [
+            [types.KeyboardButton(text=CREATE_ORDER_BUTTON)]
+        ]
 
-    # Параметры сетки с кнопками
-    keyboard = types.ReplyKeyboardMarkup(
-        keyboard=kb,
-        resize_keyboard=True
-    )
-    # Вывод сообщения и кнопок
-    await message.answer(CREATE_ORDER, reply_markup=keyboard)
+        # Параметры сетки с кнопками
+        keyboard = types.ReplyKeyboardMarkup(
+            keyboard=kb,
+            resize_keyboard=True
+        )
+        # Вывод сообщения и кнопок
+        await message.answer(CREATE_ORDER, reply_markup=keyboard)
 
 
 # Хендлер команды "Создать заказ"
 @dp.message(F.text.lower() == CREATE_ORDER_BUTTON.lower())
 async def create_order(message: types.Message):
-    if check_user(str(message.from_user.id)):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
         order.clean()
 
         # Создание кнопок
@@ -148,12 +178,13 @@ async def create_order(message: types.Message):
 
 
 ##########################################################################
+# Категории
 
 
 # Полиграфия 1
 @dp.message(F.text.lower() == K1.lower())
 async def polygraphy(message: types.Message):
-    if check_user(str(message.from_user.id)):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
         order.set_category(K1)
 
         # Создание кнопок
@@ -175,13 +206,13 @@ async def polygraphy(message: types.Message):
 # Широкоформат 2
 @dp.message(F.text.lower() == K2.lower())
 async def shirikoformat(message: types.Message):
-    if check_user(str(message.from_user.id)):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
         order.set_category(K2)
 
         # Создание кнопок
         kb = [
             [types.KeyboardButton(text=K2P1)],
-            [types.KeyboardButton(text=K2P3)],
+            [types.KeyboardButton(text=K2P2)],
             [types.KeyboardButton(text=K2P3)],
             [types.KeyboardButton(text=K2P4)]
         ]
@@ -199,7 +230,7 @@ async def shirikoformat(message: types.Message):
 # Шелкография, ДТФ 3
 @dp.message(F.text.lower() == K3.lower())
 async def shelkographia_dtf(message: types.Message):
-    if check_user(str(message.from_user.id)):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
         order.set_category(K3)
 
         # Создание кнопок
@@ -222,7 +253,7 @@ async def shelkographia_dtf(message: types.Message):
 # Сувениры 4
 @dp.message(F.text.lower() == K4.lower())
 async def suvenirs(message: types.Message):
-    if check_user(str(message.from_user.id)):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
         order.set_category(K4)
 
         # Создание кнопок
@@ -246,7 +277,7 @@ async def suvenirs(message: types.Message):
 # Флаги, сублимация 5
 @dp.message(F.text.lower() == K5.lower())
 async def flags_sublimation(message: types.Message):
-    if check_user(str(message.from_user.id)):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
         order.set_category(K5)
 
         # Создание кнопок
@@ -268,7 +299,7 @@ async def flags_sublimation(message: types.Message):
 # Конструкции, монтажи 6
 @dp.message(F.text.lower() == K6.lower())
 async def constructions_montages(message: types.Message):
-    if check_user(str(message.from_user.id)):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
         order.set_category(K6)
 
         # Создание кнопок
@@ -292,7 +323,7 @@ async def constructions_montages(message: types.Message):
 # Закупка 7
 @dp.message(F.text.lower() == K7.lower())
 async def zakupka(message: types.Message):
-    if check_user(str(message.from_user.id)):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
         order.set_category(K7)
 
         # Создание кнопок
@@ -316,7 +347,7 @@ async def zakupka(message: types.Message):
 # Расчёт 8
 @dp.message(F.text.lower() == K8.lower())
 async def rasschet(message: types.Message):
-    if check_user(str(message.from_user.id)):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
         order.set_category(K8)
 
         # Создание кнопок
@@ -339,13 +370,13 @@ async def rasschet(message: types.Message):
 
 
 ##########################################################################
-# Свойства
+# Подкатегории
 
 
 # Цифровая печать 1 1
 @dp.message(F.text.lower() == K1P1.lower())
 async def k1p1(message: types.Message):
-    if check_user(str(message.from_user.id)):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
         global ready
 
         order.set_sub_category(K1P1)
@@ -353,25 +384,235 @@ async def k1p1(message: types.Message):
         ready = True
 
 
+# Офсет 1 2
+@dp.message(F.text.lower() == K1P2.lower())
+async def k1p2(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K1P2)
+        await message.answer(K1P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Баннеры 2 1
+@dp.message(F.text.lower() == K2P1.lower())
+async def k2p1(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K2P1)
+        await message.answer(K2P1_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Наклейки 2 2
+@dp.message(F.text.lower() == K2P2.lower())
+async def k2p2(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K2P2)
+        await message.answer(K2P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Таблички 2 3
+@dp.message(F.text.lower() == K2P3.lower())
+async def k2p3(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K2P3)
+        await message.answer(K2P3_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Стенды 2 4
+@dp.message(F.text.lower() == K2P4.lower())
+async def k2p4(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K2P4)
+        await message.answer(K2P4_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Шелкография 3 1
+@dp.message(F.text.lower() == K3P1.lower())
+async def k3p1(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K3P1)
+        await message.answer(K3P1_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# ДТФ 3 2
+@dp.message(F.text.lower() == K3P2.lower())
+async def k3p2(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K3P2)
+        await message.answer(K3P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Термотрансфер 3 3
+@dp.message(F.text.lower() == K3P3.lower())
+async def k3p3(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K3P3)
+        await message.answer(K3P3_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# УФ-печать 4 1
+@dp.message(F.text.lower() == K4P1.lower())
+async def k4p1(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K4P1)
+        await message.answer(K4P1_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Гравировка 4 2
+@dp.message(F.text.lower() == K4P2.lower())
+async def k4p2(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K4P2)
+        await message.answer(K4P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Тиснение 4 3
+@dp.message(F.text.lower() == K4P3.lower())
+async def k4p3(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K4P3)
+        await message.answer(K4P3_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Сублимация 4 4
+@dp.message(F.text.lower() == K4P4.lower())
+async def k4p4(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K4P4)
+        await message.answer(K4P4_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Флаги 5 1
+@dp.message(F.text.lower() == K5P1.lower())
+async def k5p1(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K5P1)
+        await message.answer(K5P1_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Пошив текстиля 5 2
+@dp.message(F.text.lower() == K5P2.lower())
+async def k5p2(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K5P2)
+        await message.answer(K5P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Джокер 6 1
+@dp.message(F.text.lower() == K6P1.lower())
+async def k6p1(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K6P1)
+        await message.answer(K6P1_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Брус 6 2
+@dp.message(F.text.lower() == K6P2.lower())
+async def k6p2(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K6P2)
+        await message.answer(K6P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Монтаж 6 3
+@dp.message(F.text.lower() == K6P3.lower())
+async def k6p3(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K6P3)
+        await message.answer(K6P3_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
+# Виндеры 6 4
+@dp.message(F.text.lower() == K6P4.lower())
+async def k6p4(message: types.Message):
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        global ready
+
+        order.set_sub_category(K6P4)
+        await message.answer(K6P4_DETAILS, reply_markup=types.ReplyKeyboardRemove())
+        ready = True
+
+
 ##########################################################################
-
-
 # Получение деталей заказа
 @dp.message()
 async def details(message: types.Message):
     global ready
-    if ready and check_user(str(message.from_user.id)):
+    if ready and check_solo(str(message.from_user.id), str(message.chat.id)):
         ready = False
 
         order.set_properties(message.text)
 
-        message_from_user = f"""Новый заказ.
-        Категория {order.get_category()}
-        Подкатегория {order.get_sub_category()}
-        Детали:
-        {order.get_properties()}"""
+        message_from_user = create_message(order)
 
-        await bot.send_message(chat_id=CHAT_ID_1, text=message_from_user)
+        chat_id = None
+        if order.get_category() == K1:
+            chat_id = CHAT_ID_1
+        elif order.get_category() == K2:
+            chat_id = CHAT_ID_2
+        elif order.get_category() == K3:
+            chat_id = CHAT_ID_3
+        elif order.get_category() == K4:
+            chat_id = CHAT_ID_4
+        elif order.get_category() == K5:
+            chat_id = CHAT_ID_5
+        elif order.get_category() == K6:
+            chat_id = CHAT_ID_6
+        else:
+            await message.answer("Ошибка выбора категории. Попробуйте снова. (Учти что нет K7 и K8)")
+
+        if chat_id:
+            await bot.send_message(chat_id=chat_id, text=message_from_user)
+            struct_id[message_from_user] = [str(message.from_user.id), order.get_category(), order.get_sub_category()]
 
         ### Повторное создание кнопки "создать заказ"
         # Создание кнопок
@@ -386,6 +627,22 @@ async def details(message: types.Message):
         )
         # Вывод сообщения и кнопок
         await message.answer(SEND, reply_markup=keyboard)
+
+    # Обсуждение в чате менеджеров
+    if check_chat(str(message.chat.id)):
+        if message.reply_to_message:
+            if str(message.reply_to_message.from_user.id) == ID_BOT:
+                try:
+                    recipient = struct_id[message.reply_to_message.text][0]
+                    category = struct_id[message.reply_to_message.text][1]
+                    sub_category = struct_id[message.reply_to_message.text][2]
+
+                    answer = f"Категория: {category}\nПодкатегория: {sub_category}\nОтвет:\n" + message.text
+                    await bot.send_message(chat_id=recipient, text=answer)
+
+                    del struct_id[message.reply_to_message.text]
+                except KeyError:
+                    await message.reply(ALREADY)
 
 
 ##########################################################################

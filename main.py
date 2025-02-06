@@ -5,13 +5,12 @@ from aiogram.filters.command import Command
 from aiogram import F
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
-from random import choice
-
 from texts import *
 from classes import *
 from settings import *
 
 ##########################################################################
+# Все объявления
 
 
 # Включаем логирование, чтобы не пропустить важные сообщения
@@ -22,22 +21,30 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 # Структура "Заказ"
 order = Order()
-# Флаг для считывания деталей заказа
-ready = False
+# Структура с флагами для считывания деталей заказа
+# Ключ - ID пользователя
+# Значение - готовность принимать детали
+struct_ready = {}
 # Словарь, где ключ это сообщение в чате менеджеров,
-# а значение, это ID пользователя, отправившего его
+# а значение, это ID пользователя, отправившего его + категория + подкатегория
 struct_id = {}
-
+# Словарь, где ключ это ID пользователя,
+# а значение, это структура order, закреплённая за ним
+struct_users = {}
 
 ##########################################################################
+# Функции проверки ID
 
 
+# Проверка на админа
 def check_admin(id):
     if id in ID_ADMIN:
         return True
     return False
 
 
+# Проверка на любого пользователя бота
+# *все люди, у которых есть доступ к боту
 def check_user(id):
     if id in ID_PEOPLE or id in ID_ADMIN:
         return True
@@ -61,8 +68,10 @@ def check_solo(id_person, id_chat):
 
 
 ##########################################################################
+# Прочие функции
 
 
+# Функция формирования сообщения о заказе
 def create_message(structure):
     return f"""Новый заказ.
         Категория: {structure.get_category()}
@@ -75,51 +84,9 @@ def create_message(structure):
 # Служебные команды для разработчика
 
 
-@dp.message(F.text.lower() == "покажи заказ")
-async def show_order(message: types.Message):
-    if check_admin(str(message.from_user.id)):
-        categ = order.get_category()
-        sub_categ = order.get_sub_category()
-        proper = order.get_properties()
-        await message.answer(f"Категория: {categ}")
-        await message.answer(f"Подкатегория: {sub_categ}")
-        await message.answer(f"Свойства:\n{proper}")
-
-
-@dp.message(F.text.lower() == "случайное заполнение")
-async def rand_order(message: types.Message):
-    if check_admin(str(message.from_user.id)):
-        categ = choice([K1, K2, K3, K4, K5, K6, K7, K8])
-        order.set_category(categ)
-
-        sub_categ = choice([K1P1, K1P2,
-                            K2P1, K2P2, K2P3, K2P4,
-                            K3P1, K3P2, K3P3,
-                            K4P1, K4P2, K4P3, K4P4,
-                            K5P1, K5P2,
-                            K6P1, K6P2, K6P3, K6P4,
-                            K7P1, K7P2, K7P3, K7P4,
-                            K8P1, K8P2, K8P3, K8P4, K8P5])
-        order.set_sub_category(sub_categ)
-
-        proper = choice(["БЛа бла бла бла бла",
-                         "Ну вот, нужно ещё придумать много свойств",
-                         "Так, пишу уже третью вариацию, и я определённо устал",
-                         "На четвёртой точно всё"])
-        order.set_properties(proper)
-        await message.answer("Ок")
-
-
-@dp.message(F.text.lower() == "очисть")
-async def clean(message: types.Message):
-    if check_admin(str(message.from_user.id)):
-        order.clean()
-        await message.answer("Ок")
-
-
 @dp.message(F.text.lower() == "id")
 async def get_id(message: types.Message):
-    if check_admin(str(message.from_user.id)):
+    if check_admin(str(message.from_user.id)) or check_chat(str(message.chat.id)):
         id_group = str(message.chat.id)
         id_user = str(message.from_user.id)
         await message.answer(f"ID группы: {id_group}\nID пользователя: {id_user}")
@@ -153,7 +120,11 @@ async def cmd_start(message: types.Message):
 @dp.message(F.text.lower() == CREATE_ORDER_BUTTON.lower())
 async def create_order(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        order.clean()
+
+        if str(message.from_user.id) not in struct_users:
+            struct_users[str(message.from_user.id)] = Order()
+
+        struct_users[str(message.from_user.id)].clean()
 
         # Создание кнопок
         kb = [
@@ -173,7 +144,7 @@ async def create_order(message: types.Message):
         builder.adjust(3)  # Количество строк меняй тут
         await message.answer(FIRST_STEP, reply_markup=builder.as_markup(
             resize_keyboard=True,
-            input_field_placeholder="Категория")
+            input_field_placeholder=STAGE_ONE_BACKTEXT)
                              )
 
 
@@ -185,7 +156,7 @@ async def create_order(message: types.Message):
 @dp.message(F.text.lower() == K1.lower())
 async def polygraphy(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        order.set_category(K1)
+        struct_users[str(message.from_user.id)].set_category(K1)
 
         # Создание кнопок
         kb = [
@@ -199,7 +170,7 @@ async def polygraphy(message: types.Message):
         builder.adjust(3)  # Количество строк меняй тут
         await message.answer(SECOND_STEP, reply_markup=builder.as_markup(
             resize_keyboard=True,
-            input_field_placeholder="Подкатегория")
+            input_field_placeholder=STAGE_TWO_BACKTEXT)
                              )
 
 
@@ -207,7 +178,7 @@ async def polygraphy(message: types.Message):
 @dp.message(F.text.lower() == K2.lower())
 async def shirikoformat(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        order.set_category(K2)
+        struct_users[str(message.from_user.id)].set_category(K2)
 
         # Создание кнопок
         kb = [
@@ -223,7 +194,7 @@ async def shirikoformat(message: types.Message):
         builder.adjust(3)  # Количество строк меняй тут
         await message.answer(SECOND_STEP, reply_markup=builder.as_markup(
             resize_keyboard=True,
-            input_field_placeholder="Подкатегория")
+            input_field_placeholder=STAGE_TWO_BACKTEXT)
                              )
 
 
@@ -231,7 +202,7 @@ async def shirikoformat(message: types.Message):
 @dp.message(F.text.lower() == K3.lower())
 async def shelkographia_dtf(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        order.set_category(K3)
+        struct_users[str(message.from_user.id)].set_category(K3)
 
         # Создание кнопок
         kb = [
@@ -246,7 +217,7 @@ async def shelkographia_dtf(message: types.Message):
         builder.adjust(3)  # Количество строк меняй тут
         await message.answer(SECOND_STEP, reply_markup=builder.as_markup(
             resize_keyboard=True,
-            input_field_placeholder="Подкатегория")
+            input_field_placeholder=STAGE_TWO_BACKTEXT)
                              )
 
 
@@ -254,7 +225,7 @@ async def shelkographia_dtf(message: types.Message):
 @dp.message(F.text.lower() == K4.lower())
 async def suvenirs(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        order.set_category(K4)
+        struct_users[str(message.from_user.id)].set_category(K4)
 
         # Создание кнопок
         kb = [
@@ -270,7 +241,7 @@ async def suvenirs(message: types.Message):
         builder.adjust(3)  # Количество строк меняй тут
         await message.answer(SECOND_STEP, reply_markup=builder.as_markup(
             resize_keyboard=True,
-            input_field_placeholder="Подкатегория")
+            input_field_placeholder=STAGE_TWO_BACKTEXT)
                              )
 
 
@@ -278,7 +249,7 @@ async def suvenirs(message: types.Message):
 @dp.message(F.text.lower() == K5.lower())
 async def flags_sublimation(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        order.set_category(K5)
+        struct_users[str(message.from_user.id)].set_category(K5)
 
         # Создание кнопок
         kb = [
@@ -292,7 +263,7 @@ async def flags_sublimation(message: types.Message):
         builder.adjust(3)  # Количество строк меняй тут
         await message.answer(SECOND_STEP, reply_markup=builder.as_markup(
             resize_keyboard=True,
-            input_field_placeholder="Подкатегория")
+            input_field_placeholder=STAGE_TWO_BACKTEXT)
                              )
 
 
@@ -300,7 +271,7 @@ async def flags_sublimation(message: types.Message):
 @dp.message(F.text.lower() == K6.lower())
 async def constructions_montages(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        order.set_category(K6)
+        struct_users[str(message.from_user.id)].set_category(K6)
 
         # Создание кнопок
         kb = [
@@ -316,7 +287,7 @@ async def constructions_montages(message: types.Message):
         builder.adjust(3)  # Количество строк меняй тут
         await message.answer(SECOND_STEP, reply_markup=builder.as_markup(
             resize_keyboard=True,
-            input_field_placeholder="Подкатегория")
+            input_field_placeholder=STAGE_TWO_BACKTEXT)
                              )
 
 
@@ -324,7 +295,7 @@ async def constructions_montages(message: types.Message):
 @dp.message(F.text.lower() == K7.lower())
 async def zakupka(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        order.set_category(K7)
+        struct_users[str(message.from_user.id)].set_category(K7)
 
         # Создание кнопок
         kb = [
@@ -340,7 +311,7 @@ async def zakupka(message: types.Message):
         builder.adjust(3)  # Количество строк меняй тут
         await message.answer(SECOND_STEP, reply_markup=builder.as_markup(
             resize_keyboard=True,
-            input_field_placeholder="Подкатегория")
+            input_field_placeholder=STAGE_TWO_BACKTEXT)
                              )
 
 
@@ -348,7 +319,7 @@ async def zakupka(message: types.Message):
 @dp.message(F.text.lower() == K8.lower())
 async def rasschet(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        order.set_category(K8)
+        struct_users[str(message.from_user.id)].set_category(K8)
 
         # Создание кнопок
         kb = [
@@ -365,7 +336,7 @@ async def rasschet(message: types.Message):
         builder.adjust(3)  # Количество строк меняй тут
         await message.answer(SECOND_STEP, reply_markup=builder.as_markup(
             resize_keyboard=True,
-            input_field_placeholder="Подкатегория")
+            input_field_placeholder=STAGE_TWO_BACKTEXT)
                              )
 
 
@@ -377,242 +348,225 @@ async def rasschet(message: types.Message):
 @dp.message(F.text.lower() == K1P1.lower())
 async def k1p1(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K1P1)
+        struct_users[str(message.from_user.id)].set_sub_category(K1P1)
         await message.answer(K1P1_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Офсет 1 2
 @dp.message(F.text.lower() == K1P2.lower())
 async def k1p2(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K1P2)
+        struct_users[str(message.from_user.id)].set_sub_category(K1P2)
         await message.answer(K1P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Баннеры 2 1
 @dp.message(F.text.lower() == K2P1.lower())
 async def k2p1(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K2P1)
+        struct_users[str(message.from_user.id)].set_sub_category(K2P1)
         await message.answer(K2P1_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Наклейки 2 2
 @dp.message(F.text.lower() == K2P2.lower())
 async def k2p2(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K2P2)
+        struct_users[str(message.from_user.id)].set_sub_category(K2P2)
         await message.answer(K2P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Таблички 2 3
 @dp.message(F.text.lower() == K2P3.lower())
 async def k2p3(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K2P3)
+        struct_users[str(message.from_user.id)].set_sub_category(K2P3)
         await message.answer(K2P3_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Стенды 2 4
 @dp.message(F.text.lower() == K2P4.lower())
 async def k2p4(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K2P4)
+        struct_users[str(message.from_user.id)].set_sub_category(K2P4)
         await message.answer(K2P4_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Шелкография 3 1
 @dp.message(F.text.lower() == K3P1.lower())
 async def k3p1(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K3P1)
+        struct_users[str(message.from_user.id)].set_sub_category(K3P1)
         await message.answer(K3P1_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # ДТФ 3 2
 @dp.message(F.text.lower() == K3P2.lower())
 async def k3p2(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K3P2)
+        struct_users[str(message.from_user.id)].set_sub_category(K3P2)
         await message.answer(K3P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Термотрансфер 3 3
 @dp.message(F.text.lower() == K3P3.lower())
 async def k3p3(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K3P3)
+        struct_users[str(message.from_user.id)].set_sub_category(K3P3)
         await message.answer(K3P3_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # УФ-печать 4 1
 @dp.message(F.text.lower() == K4P1.lower())
 async def k4p1(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K4P1)
+        struct_users[str(message.from_user.id)].set_sub_category(K4P1)
         await message.answer(K4P1_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Гравировка 4 2
 @dp.message(F.text.lower() == K4P2.lower())
 async def k4p2(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K4P2)
+        struct_users[str(message.from_user.id)].set_sub_category(K4P2)
         await message.answer(K4P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Тиснение 4 3
 @dp.message(F.text.lower() == K4P3.lower())
 async def k4p3(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K4P3)
+        struct_users[str(message.from_user.id)].set_sub_category(K4P3)
         await message.answer(K4P3_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Сублимация 4 4
 @dp.message(F.text.lower() == K4P4.lower())
 async def k4p4(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K4P4)
+        struct_users[str(message.from_user.id)].set_sub_category(K4P4)
         await message.answer(K4P4_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Флаги 5 1
 @dp.message(F.text.lower() == K5P1.lower())
 async def k5p1(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K5P1)
+        struct_users[str(message.from_user.id)].set_sub_category(K5P1)
         await message.answer(K5P1_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Пошив текстиля 5 2
 @dp.message(F.text.lower() == K5P2.lower())
 async def k5p2(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K5P2)
+        struct_users[str(message.from_user.id)].set_sub_category(K5P2)
         await message.answer(K5P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Джокер 6 1
 @dp.message(F.text.lower() == K6P1.lower())
 async def k6p1(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K6P1)
+        struct_users[str(message.from_user.id)].set_sub_category(K6P1)
         await message.answer(K6P1_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Брус 6 2
 @dp.message(F.text.lower() == K6P2.lower())
 async def k6p2(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K6P2)
+        struct_users[str(message.from_user.id)].set_sub_category(K6P2)
         await message.answer(K6P2_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Монтаж 6 3
 @dp.message(F.text.lower() == K6P3.lower())
 async def k6p3(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K6P3)
+        struct_users[str(message.from_user.id)].set_sub_category(K6P3)
         await message.answer(K6P3_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 # Виндеры 6 4
 @dp.message(F.text.lower() == K6P4.lower())
 async def k6p4(message: types.Message):
     if check_solo(str(message.from_user.id), str(message.chat.id)):
-        global ready
 
-        order.set_sub_category(K6P4)
+        struct_users[str(message.from_user.id)].set_sub_category(K6P4)
         await message.answer(K6P4_DETAILS, reply_markup=types.ReplyKeyboardRemove())
-        ready = True
+        struct_ready[str(message.from_user.id)] = True
 
 
 ##########################################################################
 # Получение деталей заказа
 @dp.message()
 async def details(message: types.Message):
-    global ready
-    if ready and check_solo(str(message.from_user.id), str(message.chat.id)):
-        ready = False
+    if struct_ready[str(message.from_user.id)] and check_solo(str(message.from_user.id), str(message.chat.id)):
+        struct_ready[str(message.from_user.id)] = False
 
-        order.set_properties(message.text)
+        struct_users[str(message.from_user.id)].set_properties(message.text)
 
-        message_from_user = create_message(order)
+        message_from_user = create_message(struct_users[str(message.from_user.id)])
 
         chat_id = None
-        if order.get_category() == K1:
+        category = struct_users[str(message.from_user.id)].get_category()
+        if category == K1:
             chat_id = CHAT_ID_1
-        elif order.get_category() == K2:
+        elif category == K2:
             chat_id = CHAT_ID_2
-        elif order.get_category() == K3:
+        elif category == K3:
             chat_id = CHAT_ID_3
-        elif order.get_category() == K4:
+        elif category == K4:
             chat_id = CHAT_ID_4
-        elif order.get_category() == K5:
+        elif category == K5:
             chat_id = CHAT_ID_5
-        elif order.get_category() == K6:
+        elif category == K6:
             chat_id = CHAT_ID_6
         else:
             await message.answer("Ошибка выбора категории. Попробуйте снова. (Учти что нет K7 и K8)")
 
         if chat_id:
             await bot.send_message(chat_id=chat_id, text=message_from_user)
-            struct_id[message_from_user] = [str(message.from_user.id), order.get_category(), order.get_sub_category()]
+            struct_id[message_from_user] = [str(message.from_user.id),
+                                            struct_users[str(message.from_user.id)].get_category(),
+                                            struct_users[str(message.from_user.id)].get_sub_category()]
 
         ### Повторное создание кнопки "создать заказ"
         # Создание кнопок

@@ -124,6 +124,9 @@ async def create_order(message: types.Message):
         if str(message.from_user.id) not in struct_users:
             struct_users[str(message.from_user.id)] = Order()
 
+        if str(message.from_user.id) not in struct_ready:
+            struct_ready[str(message.from_user.id)] = False
+
         struct_users[str(message.from_user.id)].clean()
 
         # Создание кнопок
@@ -538,50 +541,53 @@ async def k6p4(message: types.Message):
 # Получение деталей заказа
 @dp.message()
 async def details(message: types.Message):
-    if struct_ready[str(message.from_user.id)] and check_solo(str(message.from_user.id), str(message.chat.id)):
-        struct_ready[str(message.from_user.id)] = False
+    if check_solo(str(message.from_user.id), str(message.chat.id)):
+        try:
+            if struct_ready[str(message.from_user.id)]:
+                struct_ready[str(message.from_user.id)] = False
 
-        struct_users[str(message.from_user.id)].set_properties(message.text)
+                struct_users[str(message.from_user.id)].set_properties(message.text)
 
-        message_from_user = create_message(struct_users[str(message.from_user.id)])
+                message_from_user = create_message(struct_users[str(message.from_user.id)])
 
-        chat_id = None
-        category = struct_users[str(message.from_user.id)].get_category()
-        if category == K1:
-            chat_id = CHAT_ID_1
-        elif category == K2:
-            chat_id = CHAT_ID_2
-        elif category == K3:
-            chat_id = CHAT_ID_3
-        elif category == K4:
-            chat_id = CHAT_ID_4
-        elif category == K5:
-            chat_id = CHAT_ID_5
-        elif category == K6:
-            chat_id = CHAT_ID_6
-        else:
-            await message.answer("Ошибка выбора категории. Попробуйте снова. (Учти что нет K7 и K8)")
+                chat_id = None
+                category = struct_users[str(message.from_user.id)].get_category()
+                if category == K1:
+                    chat_id = CHAT_ID_1
+                elif category == K2:
+                    chat_id = CHAT_ID_2
+                elif category == K3:
+                    chat_id = CHAT_ID_3
+                elif category == K4:
+                    chat_id = CHAT_ID_4
+                elif category == K5:
+                    chat_id = CHAT_ID_5
+                elif category == K6:
+                    chat_id = CHAT_ID_6
+                else:
+                    await message.answer("Ошибка выбора категории. Попробуйте снова. (Учти что нет K7 и K8)")
 
-        if chat_id:
-            await bot.send_message(chat_id=chat_id, text=message_from_user)
-            struct_id[message_from_user] = [str(message.from_user.id),
-                                            struct_users[str(message.from_user.id)].get_category(),
-                                            struct_users[str(message.from_user.id)].get_sub_category()]
+                if chat_id:
+                    await bot.send_message(chat_id=chat_id, text=message_from_user)
+                    struct_id[message_from_user] = [str(message.from_user.id),
+                                                    struct_users[str(message.from_user.id)].get_category(),
+                                                    struct_users[str(message.from_user.id)].get_sub_category()]
 
-        ### Повторное создание кнопки "создать заказ"
-        # Создание кнопок
-        kb = [
-            [types.KeyboardButton(text=CREATE_ORDER_BUTTON)]
-        ]
+                ### Повторное создание кнопки "создать заказ"
+                # Создание кнопок
+                kb = [
+                    [types.KeyboardButton(text=CREATE_ORDER_BUTTON)]
+                ]
 
-        # Параметры сетки с кнопками
-        keyboard = types.ReplyKeyboardMarkup(
-            keyboard=kb,
-            resize_keyboard=True
-        )
-        # Вывод сообщения и кнопок
-        await message.answer(SEND, reply_markup=keyboard)
-
+                # Параметры сетки с кнопками
+                keyboard = types.ReplyKeyboardMarkup(
+                    keyboard=kb,
+                    resize_keyboard=True
+                )
+                # Вывод сообщения и кнопок
+                await message.answer(SEND, reply_markup=keyboard)
+        except KeyError:
+            pass
     # Обсуждение в чате менеджеров
     if check_chat(str(message.chat.id)):
         if message.reply_to_message:

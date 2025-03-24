@@ -28,14 +28,13 @@ order = Order()
 # Значение - готовность принимать детали
 struct_ready = {}
 
-# Словарь, где ключ это сообщение в чате менеджеров,
-# а значение, это ID пользователя, отправившего его + категория + подкатегория
+# Словарь, где ключ это ID пользователя,
+# а значение, массив из отправленных сообщений и массивов с фото
 struct_id = {}
 
 # Словарь, где ключ это ID пользователя,
 # а значение, это структура order, закреплённая за ним
 struct_users = {}
-
 ##########################################################################
 # Функции проверки ID
 
@@ -78,9 +77,9 @@ def check_solo(id_person, id_chat):
 # Функция формирования сообщения о заказе
 def create_message(structure):
     return f"""Новый заказ.
-        Категория: {structure.get_category()}
-        Подкатегория: {structure.get_sub_category()}
-        Детали:"""
+    Категория: {structure.get_category()}
+    Подкатегория: {structure.get_sub_category()}
+    Детали:"""
 
 
 ##########################################################################
@@ -146,7 +145,18 @@ async def cmd_finish(message: types.Message):
         await bot.send_message(chat_id=chat_id, text=message_from_user)
 
         for msg in struct_id[str(message.from_user.id)]:
-            await bot.send_message(chat_id=chat_id, text=msg)
+            if type(msg) is list:
+                for ph in msg:
+                    print(ph)
+                    try:
+                        await bot.send_photo(chat_id=chat_id, photo=ph.file_id)
+                    except:
+                        await bot.send_document(chat_id=chat_id, document=ph.file_id)
+            else:
+                await bot.send_message(chat_id=chat_id, text=msg)
+
+        struct_id[str(message.from_user.id)].append(message_from_user)
+
         print(struct_id)
         print(struct_users)
         print(struct_ready)
@@ -182,6 +192,8 @@ async def create_order(message: types.Message):
             struct_id[str(message.from_user.id)] = []
 
         struct_users[str(message.from_user.id)].clean()
+        struct_ready[str(message.from_user.id)] = False
+        struct_id[str(message.from_user.id)] = []
 
         # Создание кнопок
         kb = [
@@ -595,17 +607,23 @@ async def k6p4(message: types.Message):
 # Получение деталей заказа
 @dp.message()
 async def details(message: types.Message):
+    i = 0
     if check_solo(str(message.from_user.id), str(message.chat.id)):
         try:
             if struct_ready[str(message.from_user.id)]:
-                # struct_ready[str(message.from_user.id)] = False
+                if message.text is not None:
 
-                struct_users[str(message.from_user.id)].set_properties(message.text)
+                    # struct_users[str(message.from_user.id)].set_properties(message.text)
 
-                # message_from_user = create_message(struct_users[str(message.from_user.id)])
-
-                # await bot.send_message(chat_id=chat_id, text=message_from_user)
-                struct_id[str(message.from_user.id)].append(message.text)
+                    struct_id[str(message.from_user.id)].append(message.text)
+                elif message.photo is not None:
+                    n = len(message.photo)
+                    struct_id[str(message.from_user.id)].append([message.photo[i]])
+                    i += 1
+                    if i >= n:
+                        i = 0
+                elif message.document is not None:
+                    struct_id[str(message.from_user.id)].append([message.document])
         except KeyError:
             pass
     # Обсуждение в чате менеджеров
@@ -623,8 +641,11 @@ async def details(message: types.Message):
                     if recipient is None:
                         await message.reply(ALREADY)
                     else:
+                        before = f"Заказ\nКатегория: {str(struct_users[str(message.from_user.id)].get_category)}\nПодкатегория: {str(struct_users[str(message.from_user.id)].get_sub_category)}"
+                        await bot.send_message(chat_id=recipient, text=before)
                         answer = message.text
                         await bot.send_message(chat_id=recipient, text=answer)
+                        await message.reply(GOOD)
 
                         del struct_id[recipient]
                 except KeyError:

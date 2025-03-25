@@ -629,9 +629,7 @@ async def details(message: types.Message):
     # Обсуждение в чате менеджеров
     if check_chat(str(message.chat.id)):
         if message.reply_to_message:
-            print(0)
             if str(message.reply_to_message.from_user.id) == ID_BOT:
-                print(1)
                 try:
                     recipient = None
                     for key, data in struct_id.items():
@@ -641,7 +639,9 @@ async def details(message: types.Message):
                     if recipient is None:
                         await message.reply(ALREADY)
                     else:
-                        before = f"Заказ\nКатегория: {str(struct_users[str(message.from_user.id)].get_category)}\nПодкатегория: {str(struct_users[str(message.from_user.id)].get_sub_category)}"
+                        cat = str(struct_users[str(message.from_user.id)].get_category())
+                        sub_cat = str(struct_users[str(message.from_user.id)].get_sub_category())
+                        before = f"Заказ\nКатегория: {cat}\nПодкатегория: {sub_cat}\nОтвет:"
                         await bot.send_message(chat_id=recipient, text=before)
                         answer = message.text
                         await bot.send_message(chat_id=recipient, text=answer)

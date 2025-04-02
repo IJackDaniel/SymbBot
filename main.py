@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher, types
+from aiogram.enums import ParseMode
 from aiogram.filters.command import Command
 from aiogram import F
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
@@ -10,7 +11,7 @@ from classes import *
 from settings import *
 
 ##########################################################################
-# Все объявления
+# Объявления
 
 
 # Включаем логирование, чтобы не пропустить важные сообщения
@@ -29,7 +30,7 @@ order = Order()
 struct_ready = {}
 
 # Словарь, где ключ это ID пользователя,
-# а значение, массив из отправленных сообщений и массивов с фото
+# а значение - массив из отправленных сообщений и массивов с фото
 struct_id = {}
 
 # Словарь, где ключ это ID пользователя,
@@ -47,14 +48,14 @@ def check_admin(id):
 
 
 # Проверка на любого пользователя бота
-# *все люди, у которых есть доступ к боту
+# (т.е. все люди, у которых есть доступ к боту)
 def check_user(id):
     if id in ID_PEOPLE or id in ID_ADMIN:
         return True
     return False
 
 
-# Проверка ID беседы (нужны беседы менеджеров)
+# Проверка ID беседы (Беседы менеджеров)
 # Беседы менеджеров, где бот - админ
 def check_chat(id):
     if id in ID_CHAT:
@@ -62,7 +63,7 @@ def check_chat(id):
     return False
 
 
-# Проверка ID беседы (нужны личные сообщения)
+# Проверка ID беседы (Личные сообщения)
 # Личное общение с ботом
 def check_solo(id_person, id_chat):
     if check_user(id_person) and not check_chat(id_chat):
@@ -147,7 +148,6 @@ async def cmd_finish(message: types.Message):
         for msg in struct_id[str(message.from_user.id)]:
             if type(msg) is list:
                 for ph in msg:
-                    print(ph)
                     try:
                         await bot.send_photo(chat_id=chat_id, photo=ph.file_id)
                     except:
@@ -157,23 +157,16 @@ async def cmd_finish(message: types.Message):
 
         struct_id[str(message.from_user.id)].append(message_from_user)
 
-        print(struct_id)
-        print(struct_users)
-        print(struct_ready)
-        ### Повторное создание кнопки "создать заказ"
-        # Создание кнопок
+        ### Повторное создание кнопки "Создать заказ"
         kb = [
             [types.KeyboardButton(text=CREATE_ORDER_BUTTON)]
         ]
 
-        # Параметры сетки с кнопками
         keyboard = types.ReplyKeyboardMarkup(
             keyboard=kb,
             resize_keyboard=True
         )
-        # Вывод сообщения и кнопок
         await message.answer(SEND, reply_markup=keyboard)
-        # Вывод сообщения и кнопок
         await message.answer(CREATE_ORDER)
 
 
@@ -607,21 +600,14 @@ async def k6p4(message: types.Message):
 # Получение деталей заказа
 @dp.message()
 async def details(message: types.Message):
-    i = 0
+    # Считывание деталей заказа
     if check_solo(str(message.from_user.id), str(message.chat.id)):
         try:
             if struct_ready[str(message.from_user.id)]:
                 if message.text is not None:
-
-                    # struct_users[str(message.from_user.id)].set_properties(message.text)
-
                     struct_id[str(message.from_user.id)].append(message.text)
                 elif message.photo is not None:
-                    n = len(message.photo)
-                    struct_id[str(message.from_user.id)].append([message.photo[i]])
-                    i += 1
-                    if i >= n:
-                        i = 0
+                    struct_id[str(message.from_user.id)].append([message.photo[-1]])
                 elif message.document is not None:
                     struct_id[str(message.from_user.id)].append([message.document])
         except KeyError:
@@ -635,21 +621,15 @@ async def details(message: types.Message):
                     for key, data in struct_id.items():
                         if message.reply_to_message.text in data:
                             recipient = key
-                    print(recipient)
                     if recipient is None:
-                        await message.reply(ALREADY)
+                        await message.reply(FAIL)
                     else:
-                        cat = str(struct_users[str(message.from_user.id)].get_category())
-                        sub_cat = str(struct_users[str(message.from_user.id)].get_sub_category())
-                        before = f"Заказ\nКатегория: {cat}\nПодкатегория: {sub_cat}\nОтвет:"
-                        await bot.send_message(chat_id=recipient, text=before)
-                        answer = message.text
-                        await bot.send_message(chat_id=recipient, text=answer)
-                        await message.reply(GOOD)
+                        before = f"Ответ на сообщение: \n```{ANSWER_HEAD}\n{message.reply_to_message.text}\n```"
+                        answer = f"{before}\n{message.text}"
+                        await bot.send_message(chat_id=recipient, text=answer, parse_mode=ParseMode.MARKDOWN_V2)
 
-                        del struct_id[recipient]
                 except KeyError:
-                    await message.reply(ALREADY)
+                    await message.reply(FAIL)
 
 
 ##########################################################################
